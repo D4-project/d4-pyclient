@@ -19,8 +19,8 @@ from urllib.parse import urlparse
 import datetime
 
 import logging
-import logging.handlers
-# # TODO: replace print by logger
+
+logger = logging.getLogger('d4-pyclient')
 
 def generate_uuid(filename):
     sensor_uuid = str(uuid.uuid4())
@@ -63,8 +63,6 @@ def pack_d4_data(version, type, sensor_uuid, hmac_key, data, destination):
     d4_header = create_d4_header(version, type, sensor_uuid, hmac_key, data)
     d4_data = d4_header + data
 
-    print(data)
-
     # Send data
     send_d4_data(destination, d4_data)
 
@@ -77,7 +75,8 @@ def send_d4_data(destination, d4_data):
 
 def get_config_from_file(filename, r_type='str'):
     if not os.path.isfile(filename):
-        print('error config file not found')
+        logger.error('config file not found: {}'.format(filename))
+        sys.exit(1)
 
     with open(filename, 'r') as f:
         config = f.read()
@@ -88,7 +87,8 @@ def get_config_from_file(filename, r_type='str'):
         try:
             config = int(config)
         except:
-            print('error config file, invalid type')
+            logger.error('config file: {}, invalid type'.format(filename))
+            sys.exit(1)
     else:
         config = config.encode()
     return config
@@ -107,7 +107,8 @@ def get_sensor_uuid(config_dir):
 
 def load_config(config_dir):
     if not os.path.isdir(config_dir):
-        print('error config file not found')
+        logger.error('This config directory is invalid: {},'.format(filename))
+        sys.exit(1)
 
     # HMAC Key
     dict_config = {}
@@ -117,26 +118,30 @@ def load_config(config_dir):
     filename = os.path.join(config_dir, 'type')
     dict_config['type'] = get_config_from_file(filename, r_type='int')
     if dict_config['type'] < 0 and dict_config['type'] > 255:
-        print('error, unsuported type')
+        logger.error('unsuported d4 type: {}'.format(dict_config['type']))
+        sys.exit(1)
 
     filename = os.path.join(config_dir, 'version')
     dict_config['version'] = get_config_from_file(filename, r_type='int')
     if dict_config['version'] < 0:
-        print('error, unsuported type')
+        logger.error('invalid version: {}'.format(dict_config['version']))
+        sys.exit(1)
 
     filename = os.path.join(config_dir, 'snaplen')
     dict_config['snaplen'] = get_config_from_file(filename, r_type='int')
-    if dict_config['snaplen'] < 0:
-        print('error, unsuported type')
+    if dict_config['snaplen'] <= 0:
+        logger.error('invalid snaplen')
+        sys.exit(1)
 
     # Sensor UUID
     dict_config['uuid'] = get_sensor_uuid(config_dir)
     return dict_config
 
-def get_destination(config_dir, verify_cert=True):
+def get_destination(config_dir, check_certificate=True):
     filename = os.path.join(config_dir, 'destination')
     if not os.path.isfile(filename):
-        print('error destination file not found')
+        logger.error('destination file not found: {}'.format(filename))
+        sys.exit(1)
 
     with open(filename, 'r') as f:
         destination = f.read().replace('\n', '')
@@ -147,13 +152,15 @@ def get_destination(config_dir, verify_cert=True):
     else:
         if not ':' in destination:
             # port = 80 ?
-            print('error, destination')
+            logger.error('The destination is invalid')
+            sys.exit(1)
         host, port = destination.rsplit(':', 1)
         # verify port
         try:
             port = int(port)
         except:
-            print('error, invalid port')
+            logger.error('Invalid port')
+            sys.exit(1)
         # verify address
         try:
             host = str(ipaddress.ip_address(host))
@@ -163,8 +170,8 @@ def get_destination(config_dir, verify_cert=True):
             try:
                 host = socket.gethostbyname(host)
             except:
-                print('Destination Host: Name or service not known')
-            print(host)
+                logger.error('Destination Host: Name or service not known')
+                sys.exit(1)
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # TCP Keepalive
@@ -173,11 +180,8 @@ def get_destination(config_dir, verify_cert=True):
         s.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 15)
         s.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 15)
 
-        ## TODO: add flag
-        verify_cert = False
-
         # SSL
-        if verify_cert:
+        if check_certificate:
             cert_reqs_option = ssl.CERT_REQUIRED
         else:
             cert_reqs_option = ssl.CERT_NONE
@@ -187,10 +191,10 @@ def get_destination(config_dir, verify_cert=True):
         try:
             client_socket.connect((host, port))
         except ConnectionRefusedError:
-            print('error, Connection to {}:{} refused'.format(host, port))
+            logger.error('Connection to {}:{} refused'.format(host, port))
             sys.exit(1)
         except ssl.SSLError as e:
-            print(e)
+            logger.error(e)
             sys.exit(1)
         return client_socket
 
@@ -198,28 +202,23 @@ def get_destination(config_dir, verify_cert=True):
 def get_metaheader_json(config_dir):
     filename = os.path.join(config_dir, 'metaheader.json')
     if not os.path.isfile(filename):
-        print('error metaheader file not found')
+        logger.error('Metaheader file not found: {}'.format(filename))
+        sys.exit(1)
 
     with open(filename, 'rb') as f:
         metaheader = f.read()
     try:
         metaheader = json.loads(metaheader)
     except:
-        print('error, invalid json file')
+        logger.error('The JSON file is invalid')
+        sys.exit(1)
     return json.dumps(metaheader).encode()
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config' ,help='config_directory' ,type=str, dest='config', required=True)
-    args = parser.parse_args()
-    config_dir = args.config
-
+def read_and_send_data(config_dir, check_certificate):
     config = load_config(config_dir)
-    destination = get_destination(config_dir)
+    destination = get_destination(config_dir, check_certificate=check_certificate)
 
     buffer = b''
-    # config['type'] = 2
-    config['snaplen'] = 64
 
     # handle extended type
     if config['type'] == 2 or config['type'] == 254:
@@ -234,18 +233,28 @@ if __name__ == "__main__":
     try:
         for data in io.open(sys.stdin.fileno(), mode='rb', buffering=0):
 
-            print(data)
-
             if data:
                 buffer = buffer + data
                 buffer = prepare_data(config['version'], config['type'], config['uuid'], config['key'], config['snaplen'], buffer, destination)
 
         pack_d4_data(config['version'], config['type'], config['uuid'],  config['key'], buffer, destination)
-        destination.close()
+        if not isinstance(destination, str):
+            destination.shutdown(socket.SHUT_RDWR)
 
     # Send buffer content
     except KeyboardInterrupt:
         # Pack data
         buffer = prepare_data(config['version'], config['type'], config['uuid'], config['key'], config['snaplen'], buffer, destination)
         pack_d4_data(config['version'], config['type'], config['uuid'],  config['key'], buffer, destination)
-        destination.close()
+        if not isinstance(destination, str):
+            destination.shutdown(socket.SHUT_RDWR)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config' ,help='config directory' ,type=str, dest='config', required=True)
+    parser.add_argument('-cc', '--check_certificate' ,help='check server certificate', action="store_true")
+    args = parser.parse_args()
+    config_dir = args.config
+    check_certificate = args.check_certificate
+
+    read_and_send_data(config_dir, check_certificate)
