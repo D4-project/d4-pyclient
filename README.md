@@ -1,17 +1,22 @@
 # Main features
 
 **d4-pyclient** is python implemention of the [D4 encapsulation
-protocol](https://github.com/D4-project/architecture/tree/master/format). 
+protocol](https://github.com/D4-project/architecture/tree/master/format).
 
 It is a low-barrier entry for anyone interested into tinkering with the D4
 protocol or embedding a d4 client into another project. It supports both regular
 types and types defined by meta-header.
 
+# Install
+```bash
+pip install d4-pyclient
+```
+
 # Launching
 
 ```shell
-./d4-pyclient.py -h
-usage: d4-pyclient.py [-h] -c CONFIG [-cc]
+./d4_client.py -h
+usage: d4_client.py [-h] -c CONFIG [-cc]
 
 optional arguments:
   -h, --help            show this help message and exit

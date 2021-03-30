@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "d4-pyclient"
+version = "0.1.4"
+description = "D4 core software client in Python"
+authors = ["Aurelien Thirion (Terrtia) <aurelien.thirion@circl.lu>"]
+license = "BSD-2-Clause"
+repository = "https://github.com/D4-project/d4-pyclient"
+
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
