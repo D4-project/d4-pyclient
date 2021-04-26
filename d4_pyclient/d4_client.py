@@ -192,6 +192,11 @@ class D4Client(object):
                         continue
                     else:
                         sys.exit(1)
+                except socket.timeout:
+                    logger.error('Connection to {}:{} timeout'.format(host, self.port))
+                    if self.reconnect:
+                        time.sleep(10)
+                        continue
                 except ssl.SSLError as e:
                     logger.error(e)
                     sys.exit(1)
