@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "d4-pyclient"
-version = "0.1.4"
+version = "0.1.5"
 description = "D4 core software client in Python"
 authors = ["Aurelien Thirion (Terrtia) <aurelien.thirion@circl.lu>"]
 license = "BSD-2-Clause"
